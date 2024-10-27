@@ -45,7 +45,7 @@ sudo apt update
 ```
 sudo apt -y install postgresql-17 postgresql-server-dev-17
 ```
-برای اطلاعات بیشتر در مورد نحوهٔ نصب پستگرس [اینجا](https://www.postgresql.org/download/linux/ubuntu/) را ببینید. 
+ 
 پس از اتمام عملیات، باید از صحت نصب مطمئن شویم. نخست محل باینری‌های پستگرس را بررسی می‌کنیم:
 ```bash
 which psql
