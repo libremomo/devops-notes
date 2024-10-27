@@ -13,8 +13,8 @@
 |  1  | psql-db-1 | psql, patroni, etcd  |     16      |    16    |    100    |  1  | 192.168.228.141 | Ubuntu 22.04 LTS |
 |  2  | psql-db-2 | psql, patroni, etcd  |     16      |    16    |    100    |  1  | 192.168.228.142 | Ubuntu 22.04 LTS |
 |  3  | psql-db-3 | psql, patroni, etcd  |     16      |    16    |    100    |  1  | 192.168.228.143 | Ubuntu 22.04 LTS |
-|  4  | psql-lb-1 | HAProxy Loadbalancer |      4      |    8     |    25     |  1  | 192.168.228.144 | Ubuntu 22.04 LTS |
-|  5  | psql-lb-2 | HAProxy Loadbalancer |      4      |    8     |    25     |  1  | 192.168.228.145 | Ubuntu 22.04 LTS |
+|  4  | psql-lb-1 | HAProxy, Keepalived  |      4      |    8     |    25     |  1  | 192.168.228.144 | Ubuntu 22.04 LTS |
+|  5  | psql-lb-2 | HAProxy, Keepalived  |      4      |    8     |    25     |  1  | 192.168.228.145 | Ubuntu 22.04 LTS |
 
 - این ماشین‌ها باید بتوانند از حیث شبکه‌‌ای همدیگر را ببینند. بهترین حالت آن است که همگی در یک سابنت قرار داشته باشند تا میزان تأخیر ارتباطات آنها به حداقل برسد و در عملیات replication اختلالی رخ ندهد.
 - لازم است یک آی‌پی دیگر نیز در همین سابنت برای استفاده به عنوان Floating IP کنار بگذاریم. (مثلاً: 192.168.228.140)
@@ -38,7 +38,7 @@ sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail htt
 sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
 ```
 پس از ایجاد `pdgd.list` یک بار کش APT را به‌روزرسانی می‌کنیم:
-```
+```bash
 sudo apt update
 ```
 در نهایت با فرمان زیر، پستگرس را نصب می‌کنیم:
@@ -47,23 +47,23 @@ sudo apt -y install postgresql-17 postgresql-server-dev-17
 ```
 برای اطلاعات بیشتر در مورد نحوهٔ نصب پستگرس [اینجا](https://www.postgresql.org/download/linux/ubuntu/) را ببینید. 
 پس از اتمام عملیات، باید از صحت نصب مطمئن شویم. نخست محل باینری‌های پستگرس را بررسی می‌کنیم:
-```
+```bash
 which psql
 ```
 خروجی فرمان بالا باید چنین باشد:
-```
+```bash
 /usr/sbin/psql
 ```
 سپس، با فرمان زیر وضعیت سرویس پستگرس را بررسی می‌کنیم:
-```
+```bash
 sudo systemctl status postgresql
 ```
 از آنجا که باید کنترل پستگرس را به پاترونی بسپریم، سرویس فعلی را که به صورت خودکار اجرا شده، متوقف می‌کنیم:
-```
+```bash
 sudo systemctl stop postgresql
 ```
 پاترونی از برخی از ابزارهایی که همراه با پستگرس نصب می‌شوند استفاده می‌کند، در نتیجه لازم است یک پیوند نمادین (symlink) از باینری‌های آن در مسیر `/usr/sbin/` قرار دهیم تا مطمئن شویم پاترونی به آنها دسترسی خواهد داشت:
-```
+```bash
 ln -s /usr/lib/postgresql/17/bin/* /usr/sbin/
 ```
 
@@ -79,15 +79,15 @@ ln -s /usr/lib/postgresql/17/bin/* /usr/sbin/
 - انتخاب نود اصلی جدید به صورت خودکار (automatic failover) در صورت افتادن نود اصلی فعلی
 
 برای نصب پاترونی از دستور زیر استفاده می‌کنیم:
-```
+```bash
 sudo apt install patroni
 ```
 پس از آن، پکیج `python3-psycopg2` را هم نصب می‌کنیم.`Psycopg` آداپتور پستگرس برای پایتون است و برنامه‌های پایتونی و پایگاه‌های دادهٔ پستگرس را به هم متصل می‌کند:
-```
+```bash
 sudo apt install python3-psycopg2
 ```
 پس از اتمام نصب، مسیر باینری‌ها و نسخهٔ پاترونی را با دستورهای زیر را بررسی می‌کنیم:
-```
+```bash
 which patroni
 
 patroni --version
@@ -189,9 +189,9 @@ etcd:
 ```yml
 bootstrap:
   dcs:
-	# Time-to-live for the leader lock, in seconds.
-	ttl: 30
-	# Number of seconds to wait between checks on the cluster state.
+    # Time-to-live for the leader lock, in seconds.
+    ttl: 30
+    # Number of seconds to wait between checks on the cluster state.
     loop_wait: 10
     # Timeout for DCS and PostgreSQL operations, in seconds.
     retry_timeout: 10
@@ -232,7 +232,7 @@ bootstrap:
         # Command to archive WAL files. This command creates a directory named 'wal_archive', checks if the file doesn't already exist, and then copies it
         archive_command: mkdir -p ../wal_archive && test ! -f ../wal_archive/%f && cp %p ../wal_archive/%f
       recovery_conf:
-	    # Command used to retrieve archived WAL files during recovery. It copies files from the 'wal_archive' directory.
+        # Command used to retrieve archived WAL files during recovery. It copies files from the 'wal_archive' directory.
         restore_command: cp ../wal_archive/%f %p
   initdb:
   # Sets the default authentication method
@@ -284,13 +284,13 @@ postgresql:
       password: <some-secure-pass-for-postgres-user>
 
   parameters:
-	# Sets the current directory as the location for Unix-domain sockets.
+    # Sets the current directory as the location for Unix-domain sockets.
     unix_socket_directories: '.'
     password_encryption: 'scram-sha-256'
 
 # These are Patroni-specific tags that control various behaviors
 tags:
-	# Allows this node to be considered for failover.
+    # Allows this node to be considered for failover.
     nofailover: false
     # Allows this node to be considered for load balancing.
     noloadbalance: false
@@ -315,7 +315,7 @@ systemctl start patroni
 systemctl status patroni
 ```
 ---
-==تذکر:==
+**تذکر:**
 چنانچه پس از راه‌اندازی اولیه لازم شد در پارامترهای قسمت `bootstrap.dcs` تغییری ایجاد کنیم، باید از دستور ‍`patronictl edit-config` استفاده کنیم.
 
 ---
@@ -347,7 +347,7 @@ sudo systemctl disable --now postgresql
 - **مقیاس‌پذیری**: به اقتضای مقیاس‌پذیری ممکن است لازم باشد لایهٔ توزیع بار را به نحو متفاوتی نسبت به لایهٔ دیتابیس گسترش بدهیم. داشتن ماشین‌های مجزا این انعطاف‌پذیری را به ما می‌دهد.
 - **امنیت**: با استفاده از نودهای مجزا برای توزیع بار می‌توانیم در صورت لزوم معماری شبکهٔ ایمن‌تری را اجرا کنیم و از یک سو، نودهای دیتابیس را در یک شبکهٔ خصوصی بگذاریم و از سوی دیگر، نودهای HAProxy را در دسترسی لایه‌ٔ اپلیکیشن قرار بدهیم.
 ---
-==تذکر:==
+**تذکر:**
 نصب و پیکربندی HAProxy باید عیناً روی هر کدام از نودهای توزیع بار صورت پذیرد. 
 
 ---
@@ -361,7 +361,7 @@ sudo apt install haproxy
 mv /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.orig
 ```
 سپس فایل جدیدی به نام `etc/haproxy/haproxy.cfg/` ایجاد می‌کنیم و خطوط زیر را به آن اضافه می‌کنیم:
-```shell
+```
 # Global configuration settings
 global
     # Maximum connections globally
@@ -434,7 +434,7 @@ sudo systemctl restart haproxy
 sudo systemctl status haproxy
 ```
 چنانچه راه‌اندازی سرویس ناموفق بود، با دستور زیر خطاهای فایل پیکربندی را بررسی کنید:
-```
+```bash
 /usr/sbin/haproxy -c -V -f /etc/haproxy/haproxy.cfg
 ```
 ## ۶- ۸. نصب و پیکربندی Keepalived
